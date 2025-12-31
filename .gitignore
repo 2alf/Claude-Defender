@@ -1,1 +1,14 @@
 __pycache__
+claudeDefender-tauri/node_modules
+claudeDefender-tauri/src-tauri/target/
+claude-defender-tauri/dist/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.log

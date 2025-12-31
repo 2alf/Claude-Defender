@@ -10,7 +10,8 @@ Detects changes to Claude Desktop MCP config and server code. Shows overlay on s
 ---
 ## Content
 - [Questions](#Qs)
-- [Setup](#setup)
+- [Setup Tauri](#setup-tauri)
+- [Setup Python](#setup-python)
 - [Usage](#usage)
 - [License](#license)
 
@@ -25,9 +26,33 @@ Protect your Claude Desktop against becoming a trojanised entry point to attacke
 ### How?
 Stores MD5 hashes of your config file and all server source files. On each Claude launch, compares current hashes against stored ones. If anything changed, shows an overlay notifying you of what changed and what should be audited.
 
+The state storage is inside a tmp MCPMonitor directory. <br>
+In each OS its stored in one of these:
+
+- **Windows**: `%LOCALAPPDATA%\MCPMonitor\`
+- **macOS**: `~/Library/Application Support/MCPMonitor/`
+- **Linux**: `~/.local/share/MCPMonitor/`
+
+
+This monitor file contains:
+- `state.json` - file hashes
+- `snapshots/` - previous versions
+- `backups/` - pre-revert backups
+
+
+### Python V Tauri
+#### Python: 
+- You need python to run it and you need to manually configure the startup checker. 
+- Easier to modify on your own.
+
+#### Tauri: 
+- We setup everything for you via installation. 
+- Slightly faster. 
+- Need rust and tauri to modify on your own.
+
 ### Bloat?
 Watch mode:
-- `~0.1% CPU, ~20MB RAM.` 
+- `~0.1% CPU, ~20MB RAM.`
 - Just sleeps and polls tasklist every second.
 
 On check: 
@@ -40,11 +65,23 @@ You won't notice it.
 - Add proper code audit with user accepting or reverting the changes.
 - Same as above, but also being able to quarantine servers.
 - Follow the `.log` installation trace that Claude Desktop provides for further Intrusion analasys
-- Rewrite in rust?
+- ~~Rewrite in rust?~~
+
+### Can i help?
+Yes. 
+We want Claude Defender to be an opensource project so PR requests are welcome.
+
+
+---
+## Setup Tauri
+Run the installation wizard you can get from the releases and Claude Defender will instantly be added to your startup.
+
+![alt text](./repo-img/taskmang.png)<br>
+*screenshot of `task-manager/startup`*
 
 ---
 
-## Setup
+## Setup Python
 #### Windows
 Add to Windows startup (`shell:startup`):
 ```bash
@@ -83,5 +120,3 @@ python claudeDefender.py --watch   # Watch for Claude launches
 
 ## License
 GPL-3.0 - requires derivative works to also be open source
-
-
