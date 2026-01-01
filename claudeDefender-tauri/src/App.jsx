@@ -10,19 +10,27 @@ function App() {
   const [selectedChange, setSelectedChange] = useState(null);
 
   useEffect(() => {
-    checkForChanges();
+    checkForChanges(true);
 
     const unlisten = listen("check-now", () => {
-      checkForChanges();
+      checkForChanges(true);
     });
+
+    // watch every 5 seconds
+    const interval = setInterval(() => {
+      checkForChanges(false);
+    }, 5000);
 
     return () => {
       unlisten.then((fn) => fn());
+      clearInterval(interval);
     };
   }, []);
 
-  async function checkForChanges() {
-    setLoading(true);
+  async function checkForChanges(showLoading = false) {
+    if (showLoading) {
+      setLoading(true);
+    }
     try {
       const result = await invoke("check_changes");
       setChanges(result);
@@ -32,7 +40,9 @@ function App() {
     } catch (error) {
       console.error("Error checking changes:", error);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   }
 
@@ -50,7 +60,7 @@ function App() {
 
   async function handleAccept() {
     try {
-      await invoke("accept_changes");
+      await invoke("accept_changes", { changes });
       alert("Changes accepted. Baseline updated.");
       await checkForChanges();
     } catch (error) {
@@ -73,9 +83,11 @@ function App() {
           <img width="400px" src={iconImage} alt="xx" className="logotitle" />
         </div>
         <h1 style={{ color: "#89db6eff" }}>All Clear!</h1>
-        <p>No changes detected in your MCP configuration or server files.</p>
-        <button onClick={checkForChanges} className="btn-secondary">
-          Check Again
+        <p style={{ fontSize: "0.9em", color: "#888"}}>
+          No changes detected in your MCP configuration or server files.
+        </p>
+        <button onClick={() => checkForChanges(true)} className="btn-secondary">
+          Audit
         </button>
       </div>
     );

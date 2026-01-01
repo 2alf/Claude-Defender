@@ -39,6 +39,8 @@ This monitor file contains:
 - `snapshots/` - previous versions
 - `backups/` - pre-revert backups
 
+<img src="./repo-img/mm.png" width=600px>
+
 
 ### Python V Tauri
 #### Python: 
@@ -62,15 +64,19 @@ It's lighter than most system tray apps. <br>
 You won't notice it.
 
 ### Future?
-- Add proper code audit with user accepting or reverting the changes.
+- ~~Add proper code audit with user accepting or reverting the changes.~~
+- Improve code AND config audit.
 - Same as above, but also being able to quarantine servers.
 - Follow the `.log` installation trace that Claude Desktop provides for further Intrusion analasys
 - ~~Rewrite in rust?~~
 
 ### Can i help?
 Yes. 
-We want Claude Defender to be an opensource project so PR requests are welcome.
+We want Claude Defender to be an opensource project so all PR requests are welcome. Please do disclose any issues, bugs, or ideas you may have.
 
+Things we would especially love PR requests (currently):
+- UI improvements for audit.
+- Finding exploits in the tauri client.
 
 ---
 ## Setup Tauri

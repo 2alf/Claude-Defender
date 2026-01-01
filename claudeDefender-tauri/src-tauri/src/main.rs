@@ -4,8 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::thread;
+use std::time::Duration;
 use chrono::Utc;
-use tauri::{Manager, Emitter, menu::{MenuBuilder, MenuItemBuilder}, tray::{TrayIconBuilder, TrayIconEvent}};
+use tauri::{Manager, Emitter, menu::{MenuBuilder, MenuItemBuilder}, tray::{TrayIconBuilder, TrayIconEvent}, AppHandle};
 use tauri_plugin_autostart::ManagerExt;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -17,6 +19,12 @@ struct FileState {
 #[derive(Debug, Serialize, Deserialize)]
 struct State {
     files: HashMap<String, FileState>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PendingChanges {
+    changes: Vec<FileChange>,
+    detected_at: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -148,7 +156,17 @@ fn check_changes() -> Result<Vec<FileChange>, String> {
 
     let state_file = state_dir.join("state.json");
     let snapshots_dir = state_dir.join("snapshots");
+    let pending_file = state_dir.join("pending.json");
     fs::create_dir_all(&snapshots_dir).map_err(|e| e.to_string())?;
+
+    // pending first 
+    if pending_file.exists() {
+        if let Ok(content) = fs::read_to_string(&pending_file) {
+            if let Ok(pending) = serde_json::from_str::<PendingChanges>(&content) {
+                return Ok(pending.changes);
+            }
+        }
+    }
 
     let mut state: State = if state_file.exists() {
         let content = fs::read_to_string(&state_file).map_err(|e| e.to_string())?;
@@ -193,25 +211,38 @@ fn check_changes() -> Result<Vec<FileChange>, String> {
                     new_content: new_content.clone(),
                     diff,
                 });
+            } 
+        } else if old_hash.is_empty() {
+            // first seen => save snap
+            state.files.insert(
+                file_key.clone(),
+                FileState {
+                    hash: current_hash,
+                    last_check: Utc::now().to_rfc3339(),
+                },
+            );
+
+            let snapshot_path = snapshots_dir.join(format!("{}.snapshot", path.file_name().unwrap().to_string_lossy()));
+            if let Ok(content) = fs::read_to_string(&path) {
+                let _ = fs::write(snapshot_path, content);
             }
-        }
-
-        state.files.insert(
-            file_key.clone(),
-            FileState {
-                hash: current_hash,
-                last_check: Utc::now().to_rfc3339(),
-            },
-        );
-
-        let snapshot_path = snapshots_dir.join(format!("{}.snapshot", path.file_name().unwrap().to_string_lossy()));
-        if let Ok(content) = fs::read_to_string(&path) {
-            let _ = fs::write(snapshot_path, content);
         }
     }
 
     let state_json = serde_json::to_string_pretty(&state).map_err(|e| e.to_string())?;
     fs::write(state_file, state_json).map_err(|e| e.to_string())?;
+
+    // save pending
+    if !changes.is_empty() {
+        let pending = PendingChanges {
+            changes: changes.clone(),
+            detected_at: Utc::now().to_rfc3339(),
+        };
+        let pending_json = serde_json::to_string_pretty(&pending).map_err(|e| e.to_string())?;
+        fs::write(pending_file, pending_json).map_err(|e| e.to_string())?;
+    } else {
+        let _ = fs::remove_file(&pending_file);
+    }  
 
     Ok(changes)
 }
@@ -220,6 +251,7 @@ fn check_changes() -> Result<Vec<FileChange>, String> {
 fn revert_changes(changes: Vec<FileChange>) -> Result<(), String> {
     let state_dir = get_state_dir();
     let backup_dir = state_dir.join("backups");
+    let pending_file = state_dir.join("pending.json");
     fs::create_dir_all(&backup_dir).map_err(|e| e.to_string())?;
 
     for change in changes {
@@ -233,14 +265,82 @@ fn revert_changes(changes: Vec<FileChange>) -> Result<(), String> {
         fs::copy(&path, &backup_path).map_err(|e| e.to_string())?;
         fs::write(&path, change.old_content).map_err(|e| e.to_string())?;
     }
-
+    let _ = fs::remove_file(pending_file);
     Ok(())
 }
 
 #[tauri::command]
-fn accept_changes() -> Result<(), String> {
+fn accept_changes(changes: Vec<FileChange>) -> Result<(), String> {
+    let state_dir = get_state_dir();
+    let state_file = state_dir.join("state.json");
+    let snapshots_dir = state_dir.join("snapshots");
+    let pending_file = state_dir.join("pending.json");
+
+    let mut state: State = if state_file.exists() {
+        let content = fs::read_to_string(&state_file).map_err(|e| e.to_string())?;
+        serde_json::from_str(&content).unwrap_or(State {
+            files: HashMap::new(),
+        })
+    } else {
+        State {
+            files: HashMap::new(),
+        }
+    };
+
+    // update state and snapshots
+    for change in changes {
+        let path = PathBuf::from(&change.path);
+        let current_hash = file_hash(&path).unwrap_or_default();
+
+        state.files.insert(
+            change.path.clone(),
+            FileState {
+                hash: current_hash,
+                last_check: Utc::now().to_rfc3339(),
+            },
+        );
+
+        // snapshot to curr
+        let snapshot_path = snapshots_dir.join(format!("{}.snapshot", path.file_name().unwrap().to_string_lossy()));
+        if let Ok(content) = fs::read_to_string(&path) {
+            let _ = fs::write(snapshot_path, content);
+        }
+    }
+
+    let state_json = serde_json::to_string_pretty(&state).map_err(|e| e.to_string())?;
+    fs::write(state_file, state_json).map_err(|e| e.to_string())?;
+
+    let _ = fs::remove_file(pending_file);
+
     Ok(())
 }
+
+///////////////////
+// watch mode -> bg monitor
+fn start_background_monitor(app: AppHandle, interval_seconds: u64) {
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_secs(interval_seconds));
+
+            match check_changes() {
+                Ok(changes) => {
+                    if !changes.is_empty() {
+                        if let Some(window) = app.get_webview_window("main") {
+                            // pop up the window from tray
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            let _ = window.emit("check-now", ());
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Background check error: {}", e);
+                }
+            }
+        }
+    });
+}
+
 
 fn main() {
     tauri::Builder::default()
@@ -258,6 +358,7 @@ fn main() {
 
             let menu = MenuBuilder::new(app)
                 .item(&show_item)
+                .separator()
                 .item(&check_item)
                 .separator()
                 .item(&quit_item)
@@ -301,6 +402,8 @@ fn main() {
 // AUTOSTART
             let autostart = app.autolaunch();
             let _ = autostart.enable();
+            
+            start_background_monitor(app.app_handle().clone(), 30);
 
             if let Some(window) = app.get_webview_window("main") {
                 let window_clone = window.clone();
