@@ -14,6 +14,7 @@ Detects changes to Claude Desktop MCP config and server code. Shows overlay on s
 - [Setup Python](#setup-python)
 - [Usage](#usage)
 - [License](#license)
+- [Hall Of Fame](#hall-of-fame)
 
 ---
 ## Qs
@@ -78,6 +79,9 @@ Things we would especially love PR requests (currently):
 - UI improvements for audit.
 - Finding exploits in the tauri client.
 
+*Before submiting a security PR please skim through or [VDP](https://github.com/2alf/Claude-Defender/blob/main/readme.md).*
+
+
 ---
 ## Setup Tauri
 Run the installation wizard you can get from the releases and Claude Defender will instantly be added to your startup.
@@ -126,3 +130,12 @@ python claudeDefender.py --watch   # Watch for Claude launches
 
 ## License
 GPL-3.0 - requires derivative works to also be open source
+<br><br><br>
+---
+# Hall Of Fame
+
+A huge thank you to everyones help to our project! <3
+
+Please check them out [here](https://github.com/2alf/Claude-Defender/blob/main/hallfoffame.md).
+
+Want to be added? Heres [how](#can-i-help)!
