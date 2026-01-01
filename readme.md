@@ -79,7 +79,7 @@ Things we would especially love PR requests (currently):
 - UI improvements for audit.
 - Finding exploits in the tauri client.
 
-*Before submiting a security PR please skim through or [VDP](https://github.com/2alf/Claude-Defender/blob/main/readme.md).*
+*Before submiting a security PR please skim through or [VDP](https://github.com/2alf/Claude-Defender/blob/main/vdp.md).*
 
 
 ---
