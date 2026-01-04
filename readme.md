@@ -1,5 +1,5 @@
 # Claude Defender
-<image src="./logo.png" width=300px>
+<image src="./repo-img/logo.png" width=300px>
 <br>
 
 ```
@@ -60,6 +60,8 @@ Watch mode:
 
 On check: 
 - Brief spike reading files and computing hashes, then back to idle.
+
+<img src="./repo-img/verycringyCPU.png" width=600px>
 
 It's lighter than most system tray apps. <br> 
 You won't notice it.
